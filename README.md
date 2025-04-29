@@ -18,8 +18,11 @@ No other libraries are required<br>
 
 ## Project Motivation<a name="motivation"></a>
 
-As a presale, I am assiged many opportunities to support. Sometime I forgot some action or schedule of opportunities.<br>
-I create this agent to help me create/update and query opportunity more effectionly  
+As a presale I need to keep track the opportunity that I am assigned to support. The agent can help me:
+- Copy the files between folders. Copy proposal template to new opportunity folder
+- Create a new opportunity
+- Update an opportunity with more details and notes
+- Query opportunities, like the urgent opportunity that I need submit proposal in 3 days, the big deal size opportunities, the opportunities that I have take actions today
 
 ## File Descriptions <a name="files"></a>
 
