@@ -14,7 +14,7 @@ This is the Python app that can be run with
 3. chainlit library to easy create chat UI
 4. pandasql library to easy query data using SQL
 No other libraries are required<br>
-example run: chainlit run presale_agent.py --port 8000<br>
+#### example run: chainlit run presale_agent.py --port 8000
 
 ## Project Motivation<a name="motivation"></a>
 
