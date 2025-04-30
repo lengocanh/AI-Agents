@@ -7,23 +7,31 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import pandas as pd
 from pandasql import sqldf
-from datetime import datetime
+from datetime import datetime, UTC
+# from mem0 import MemoryClient
 
 
 # Load environment variables
 load_dotenv()
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+MEM0_API_KEY=os.getenv("MEM0_API_KEY")
+MEM0_PRESALE_USER_ID=os.getenv("MEM0_PRESALE_USER_ID")
+MEM0_PRESALE_AGENT_ID=os.getenv("MEM0_PRESALE_AGENT_ID")
+
 MODEL_NAME = os.getenv("MODEL_NAME")
 COMPANY_NAME = os.getenv("COMPANY_NAME")
 WORKSHARE_FOLDER = os.getenv("WORKSHARE_FOLDER")
 PROPOSAL_TEMPLATE = os.getenv("PROPOSAL_TEMPLATE")
 
 # Initialize OpenAI client
-client = OpenAI(
+openai_client = OpenAI(
     base_url=OPENAI_BASE_URL,
     api_key=OPENAI_API_KEY
 )
+# Initialize OpenAI client
+# mem0_client = MemoryClient(api_key=MEM0_API_KEY)
 
 # Tool function to copy files
 def copy_files(source_path: str, destination_path: str, file_pattern: str = "*") -> dict[str, str]:
@@ -167,7 +175,7 @@ def update_opportunity(opp_id: str = "", opp_name: str = "", new_opp_id: str = "
         if stage:
                 df.loc[mask, "stage"] = stage
         if details:
-                df.loc[mask, "details"] = df.loc[mask, "details"]+ "\n" + details
+                df.loc[mask, "details"] = df.loc[mask, "details"] +"\n"+ details
         df.to_excel(EXCEL_FILE, sheet_name=SHEET_NAME, index=False)
         identifier = opp_id or opp_name
         return f"Opportunity {identifier} updated."
@@ -286,35 +294,45 @@ query_opportunities_schema = {
 # System Prompt for the Agent
 # ----------------------------
 SYSTEM_PROMPT = (
-    f"You are a presales assistant at {COMPANY_NAME}, support sales opportunities. Current time is {datetime.now()}. Your tools are:\n"
+    f"You are a presales assistant at {COMPANY_NAME}, support sales opportunities. Your tools are:\n"
     "1) 'lookup_patient_data' Copies files from a source folder to a destination folder.\n"
-    f"-The proposal template is '{PROPOSAL_TEMPLATE}' in folder '{WORKSHARE_FOLDER}\\00 Latest Templates\\Proposal Template\\01 Development Proposal'.\n"
-    f"-Opportunity folder is opportunity name, under customer name folder in '{WORKSHARE_FOLDER}'.\n"
-    "i.e., opportunity 'Build AI Agents' for customer NTU has folder name '{WORKSHARE_FOLDER}\\NTU\\Build AI Agents'.\n"
+    f"- The proposal template is '{PROPOSAL_TEMPLATE}' in folder '{WORKSHARE_FOLDER}\\00 Latest Templates\\Proposal Template\\01 Development Proposal'.\n"
+    f"- Opportunity folder is opportunity name, under customer name folder in '{WORKSHARE_FOLDER}'.\n"
+    f"- i.e., opportunity 'Build AI Agents' for customer NTU has folder name '{WORKSHARE_FOLDER}\\NTU\\Build AI Agents'.\n"
     "2) 'add_opportunity' Add a new opportunity (unique opp_name, optional opp_id).\n"
     "3) 'update_opportunity' Update an opportunity by opp_id or opp_name, including setting new_opp_id or other fields..\n"
-	"4) 'query_opportunities' Query opportunities using SQL.\n"
-    # "When asked to append information to the `details` field of an opportunity:.\n"
-    # "1) Identify the opportunity by `opp_id` or `opp_name` from the user’s request.\n"
-    # "2) Use `query_opportunities` with an SQL query (e.g., `SELECT details FROM opportunities WHERE opp_name = 'AI Platform'`) to retrieve the existing `details`.\n"
-    # "3) If no opportunity is found, respond: 'No opportunity found for [opp_id or opp_name].'.\n"
-    # "4) Append the new information to the existing `details` (e.g., add a new line with the new text).\n"
-    # "5) Use `update_opportunity` to update the opportunity with the modified `details`, keeping other fields unchanged.\n"
-    # "6) Respond with: \"Details updated for [opp_id or opp_name]\".\n"
-    # "Focus on sales opportunities and avoid unrelated topics. Use tools for all operations and provide concise, relevant responses.\n"
+	"4) 'query_opportunities' Query opportunities using SQL.\n\n"
+    # "When asked to append information to the `details` field (e.g., 'Append [text] to details of [opp_name or opp_id]'):\n"
+    # "1. Extract the opp_id or opp_name and the text to append.\n"
+    # "2. Call `query_opportunities` with an SQL query (e.g., `SELECT details, opp_id, opp_name FROM opportunities WHERE opp_name = '[opp_name]' OR opp_id = '[opp_id]'`) to retrieve `details` and identifiers.\n"
+    # "3. If no opportunity is found, respond: 'No opportunity found for [opp_id or opp_name].'\n"
+    # "4. Append the new text to the existing `details` with a newline (e.g., existing_details + '\\n' + new_text). If `details` is empty, use the new text.\n"
+    # "5. Call `update_opportunity` in the SAME RESPONSE, using the same opp_id or opp_name, setting `details` to the appended text. Do not modify other fields.\n"
+    # "6. Respond with: 'Details updated for [opp_id or opp_name].'\n\n"
+    f"If you need to know the current date or time, use the date time now [{datetime.now(UTC).isoformat()}].\n"
+    "Focus on sales opportunities and avoid unrelated topics. Use tools for all operations and provide concise, relevant responses.\n"
 )
 
 @cl.on_chat_start
 async def start():
-    await cl.Message(content=f"Welcome to Anh's Agent! I can help manage opportunity. Current time is {datetime.now()}.'").send()
+    await cl.Message(content=f"Welcome to Anh's Agent! I can help manage opportunity.'").send()
 
 @cl.on_message
 async def main(message: cl.Message):
+
+    # Retrieve relevant memories from Mem0
+    # memories = mem0_client.search(message.content, agent_id=MEM0_PRESALE_AGENT_ID, top_k=3)
+    # memory_context = "\n".join([m["memory"] for m in memories]) if memories else "No relevant memories found."
+    
     # Create chat completion with function calling
-    response = client.chat.completions.create(
+    response = openai_client.chat.completions.create(
         model=MODEL_NAME,  # Adjust model based on your endpoint
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
+            # {"role": "system", "content": (
+            #     f"{SYSTEM_PROMPT}"
+            #     "Use the following recent memories to personalize responses, if relevant:\n"
+            #     f"{memory_context}\n" )},
             {"role": "user", "content": message.content}
         ],
         tools=[{"type": "function", "function": copy_files_schema},
@@ -327,8 +345,8 @@ async def main(message: cl.Message):
     # Process response
     message_response = response.choices[0].message
     if message_response.tool_calls:
+        tool_responses = []
         for tool_call in message_response.tool_calls:
-            result_content = ''
             if tool_call.function.name == "copy_files":
                 # Parse function arguments
                 args = json.loads(tool_call.function.arguments)
@@ -344,31 +362,30 @@ async def main(message: cl.Message):
                 await cl.Message(content=result["message"]).send()
                 
                 # Append result to conversation for context
-                result_content = json.dumps(result)
+                tool_responses.append({"role": "tool", "content": result["message"], "tool_call_id": tool_call.id}) 
 				
             elif tool_call.function.name == "add_opportunity":
                 arguments = json.loads(tool_call.function.arguments)
                 result = add_opportunity(
-										customer_name=arguments["customer_name"],
+                    customer_name=arguments["customer_name"],
                     opp_name=arguments["opp_name"],
-										opp_id=arguments.get("opp_id", ""),
-										deal_size=arguments.get("deal_size", ""),
-										stage=arguments.get("stage", ""),
-										details=arguments.get("details", ""),
-										submission_date=arguments.get("submission_date", ""),
-										tender_briefing_date=arguments.get("tender_briefing_date", ""),
-										review1_date=arguments.get("review1_date", ""),
-										review2_date=arguments.get("review2_date", ""),
-										am_name=arguments.get("am_name", ""),
-										offshore=arguments.get("offshore", ""),
-										bcc_review_date=arguments.get("bcc_review_date", "")
-								)
+                    opp_id=arguments.get("opp_id", ""),
+                    deal_size=arguments.get("deal_size", ""),
+                    stage=arguments.get("stage", ""),
+                    details=arguments.get("details", ""),
+                    submission_date=arguments.get("submission_date", ""),
+                    tender_briefing_date=arguments.get("tender_briefing_date", ""),
+                    review1_date=arguments.get("review1_date", ""),
+                    review2_date=arguments.get("review2_date", ""),
+                    am_name=arguments.get("am_name", ""),
+                    offshore=arguments.get("offshore", ""),
+                    bcc_review_date=arguments.get("bcc_review_date", "")
+                )
                 # Send result to Chainlit UI
                 await cl.Message(content=result).send()
                 
 				# Append result to conversation for context
-                result_content = json.dumps(result)
-                	
+                tool_responses.append({"role": "tool", "content": result, "tool_call_id": tool_call.id})	
  
             elif tool_call.function.name == "update_opportunity":
                 arguments = json.loads(tool_call.function.arguments)
@@ -392,7 +409,7 @@ async def main(message: cl.Message):
                 await cl.Message(content=result).send()
                 
 				# Append result to conversation for context
-                result_content = json.dumps(result)
+                tool_responses.append({"role": "tool", "content": result, "tool_call_id": tool_call.id})
             
             elif tool_call.function.name == "query_opportunities":
                 arguments = json.loads(tool_call.function.arguments)
@@ -402,19 +419,24 @@ async def main(message: cl.Message):
                 result = query_opportunities(sql_query=sql_query)
 
 				# Append result to conversation for context
-                result_content = "\n".join(result)
-            response = client.chat.completions.create(
+                tool_responses.append({"role": "tool", "content": "\n".join(result), "tool_call_id": tool_call.id})
+            system_content = {"role": "system", 
+                              "content": (f"You are a presales assistant at {COMPANY_NAME}. "
+                                "Use the tool results to provide concise, relevant responses. "
+                                "Focus on sales opportunities.\n"
+                                f"If you need to know the current date or time, use the date time now [{datetime.now(UTC).isoformat()}]")}
+            user_content = {"role": "user", "content": message.content}
+            assistant_content = {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls}
+
+            followup_messages = [system_content, user_content, assistant_content] + tool_responses
+
+            # Store interaction in Mem0
+            # mem0_client.add(messages=[user_content, assistant_content], agent_id=MEM0_PRESALE_AGENT_ID)
+
+            # Follow-up OpenAI call with tool results
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": f"Current time is {datetime.now()}. You are a presales assistant at {COMPANY_NAME}. Use the tool results to provide concise, relevant responses. Focus on sales opportunities."},
-                    {"role": "user", "content": message.content},
-                    {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls},
-                    {
-                        "role": "tool",
-                        "content": result_content,
-                        "tool_call_id": tool_call.id
-                    }
-                ]
+                messages=followup_messages
             )  
             await cl.Message(content=response.choices[0].message.content).send()	 					
                 

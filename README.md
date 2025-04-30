@@ -30,7 +30,18 @@ As a presale I need to keep track the opportunity that I am assigned to support.
 The file contain scripts of agent
 
 ## Results<a name="results"></a>
-The agent help me talk to my data of opportunities in nature language
+The agent help me talk to my data of opportunities in nature language<br>
+I tried to use Mem0 to enhance the memory of the agent but the limit is 1000 query per month only.<br>
+I tried OpenAI’s tool-chaining capabilities but it does not work. Seem OpenAI does not support it.<br>
+The prompt of tool-chaining that does not work with OpenAI. Only `query_opportunities` is called:<br>
+"When asked to append information to the `details` field (e.g., 'Append [text] to details of [opp_name or opp_id]'):\n"<br>
+"1. Extract the opp_id or opp_name and the text to append.\n"<br>
+"2. Call `query_opportunities` with an SQL query (e.g., `SELECT details, opp_id, opp_name FROM opportunities WHERE opp_name = '[opp_name]' OR opp_id = '[opp_id]'`) to retrieve `details` and identifiers.\n"<br>
+"3. If no opportunity is found, respond: 'No opportunity found for [opp_id or opp_name].'\n"<br>
+"4. Append the new text to the existing `details` with a newline (e.g., existing_details + '\\n' + new_text). If `details` is empty, use the new text.\n"<br>
+"5. Call `update_opportunity` in the SAME RESPONSE, using the same opp_id or opp_name, setting `details` to the appended text. Do not modify other fields.\n"<br>
+"6. Respond with: 'Details updated for [opp_id or opp_name].'"<br>
+
 
 ## Licensing, Authors, Acknowledgements<a name="licensing"></a>
 Feel free to use the code here as you would like! <br>
