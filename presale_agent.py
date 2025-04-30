@@ -286,7 +286,7 @@ query_opportunities_schema = {
 # System Prompt for the Agent
 # ----------------------------
 SYSTEM_PROMPT = (
-    f"You are a presales assistant at {COMPANY_NAME}, support sales opportunities. Your tools are:\n"
+    f"You are a presales assistant at {COMPANY_NAME}, support sales opportunities. Current time is {datetime.now()}. Your tools are:\n"
     "1) 'lookup_patient_data' Copies files from a source folder to a destination folder.\n"
     f"-The proposal template is '{PROPOSAL_TEMPLATE}' in folder '{WORKSHARE_FOLDER}\\00 Latest Templates\\Proposal Template\\01 Development Proposal'.\n"
     f"-Opportunity folder is opportunity name, under customer name folder in '{WORKSHARE_FOLDER}'.\n"
@@ -306,7 +306,7 @@ SYSTEM_PROMPT = (
 
 @cl.on_chat_start
 async def start():
-    await cl.Message(content="Welcome to Anh's Agent! I can help manage opportunity'").send()
+    await cl.Message(content=f"Welcome to Anh's Agent! I can help manage opportunity. Current time is {datetime.now()}.'").send()
 
 @cl.on_message
 async def main(message: cl.Message):
@@ -328,6 +328,7 @@ async def main(message: cl.Message):
     message_response = response.choices[0].message
     if message_response.tool_calls:
         for tool_call in message_response.tool_calls:
+            result_content = ''
             if tool_call.function.name == "copy_files":
                 # Parse function arguments
                 args = json.loads(tool_call.function.arguments)
@@ -341,22 +342,9 @@ async def main(message: cl.Message):
                 
                 # Send result to Chainlit UI
                 await cl.Message(content=result["message"]).send()
-                current_time = datetime.now()
+                
                 # Append result to conversation for context
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": f"You are a presales assistant at {COMPANY_NAME}. Use the tool results to provide concise, relevant responses. Focus on sales opportunities. Current time is {current_time}"},
-                        {"role": "user", "content": message.content},
-                        {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls},
-                        {
-                            "role": "tool",
-                            "content": json.dumps(result),
-                            "tool_call_id": tool_call.id
-                        }
-                    ]
-                )
-                await cl.Message(content=response.choices[0].message.content).send()
+                result_content = json.dumps(result)
 				
             elif tool_call.function.name == "add_opportunity":
                 arguments = json.loads(tool_call.function.arguments)
@@ -378,21 +366,9 @@ async def main(message: cl.Message):
                 # Send result to Chainlit UI
                 await cl.Message(content=result).send()
                 
-								# Append result to conversation for context
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": f"You are a presales assistant at {COMPANY_NAME}. Use the tool results to provide concise, relevant responses. Focus on sales opportunities."},
-                        {"role": "user", "content": message.content},
-                        {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls},
-                        {
-                            "role": "tool",
-                            "content": result,
-                            "tool_call_id": tool_call.id
-                        }
-                    ]
-                ) 
-                await cl.Message(content=response.choices[0].message.content).send()	
+				# Append result to conversation for context
+                result_content = json.dumps(result)
+                	
  
             elif tool_call.function.name == "update_opportunity":
                 arguments = json.loads(tool_call.function.arguments)
@@ -415,21 +391,8 @@ async def main(message: cl.Message):
                 # Send result to Chainlit UI
                 await cl.Message(content=result).send()
                 
-								# Append result to conversation for context
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": f"You are a presales assistant at {COMPANY_NAME}. Use the tool results to provide concise, relevant responses. Focus on sales opportunities."},
-                        {"role": "user", "content": message.content},
-                        {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls},
-                        {
-                            "role": "tool",
-                            "content": result,
-                            "tool_call_id": tool_call.id
-                        }
-                    ]
-                )  
-                await cl.Message(content=response.choices[0].message.content).send()  
+				# Append result to conversation for context
+                result_content = json.dumps(result)
             
             elif tool_call.function.name == "query_opportunities":
                 arguments = json.loads(tool_call.function.arguments)
@@ -439,20 +402,21 @@ async def main(message: cl.Message):
                 result = query_opportunities(sql_query=sql_query)
 
 				# Append result to conversation for context
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": f"You are a presales assistant at {COMPANY_NAME}. Use the tool results to provide concise, relevant responses. Focus on sales opportunities."},
-                        {"role": "user", "content": message.content},
-                        {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls},
-                        {
-                            "role": "tool",
-                            "content": "\n".join(result),
-                            "tool_call_id": tool_call.id
-                        }
-                    ]
-                )  
-                await cl.Message(content=response.choices[0].message.content).send()	 					
+                result_content = "\n".join(result)
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": f"Current time is {datetime.now()}. You are a presales assistant at {COMPANY_NAME}. Use the tool results to provide concise, relevant responses. Focus on sales opportunities."},
+                    {"role": "user", "content": message.content},
+                    {"role": "assistant", "content": None, "tool_calls": message_response.tool_calls},
+                    {
+                        "role": "tool",
+                        "content": result_content,
+                        "tool_call_id": tool_call.id
+                    }
+                ]
+            )  
+            await cl.Message(content=response.choices[0].message.content).send()	 					
                 
     else:
         await cl.Message(content=message_response.content).send()
