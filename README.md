@@ -26,6 +26,7 @@ As a presale I need to keep track the opportunity that I am assigned to support.
 - Create a new opportunity
 - Update an opportunity with more details and notes
 - Query opportunities, like the urgent opportunity that I need submit proposal in 3 days, the big deal size opportunities, the opportunities that I have to take actions today
+- Draw chart of opportunities or other data if provided
 
 ## File Descriptions <a name="files"></a>
 

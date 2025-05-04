@@ -408,7 +408,7 @@ def draw_chart_tool(chart_query: str) -> str:
 draw_chart = Tool(
     name="draw_chart",
     func=draw_chart_tool,
-    description="Generate a chart based on the user's query and return the file path.",
+    description=draw_chart_tool.__doc__,
     return_direct=True  #This stops the agent after tool executes
 )
 
@@ -445,8 +445,7 @@ prompt = ChatPromptTemplate.from_messages([
         - Generate Python code to create the chart using the data.
         - Save the chart as a PNG to a temporary file.
      3. The tool returns the path to the temporary file.
-     4. Respond with the raw path to the temporary file (e.g., '/tmp/chart_1234567890.png'). UI will handle the file and display it.
-     5. If the chart generation fails, respond with the error message (e.g., 'Error generating chart: [error message]').
+     4. If the chart generation fails, respond with the error message (e.g., 'Error generating chart: [error message]').
 
      If you need to know the current date or time, use the date time now [{datetime.now(UTC).isoformat()}].
      
